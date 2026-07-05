@@ -44,7 +44,7 @@ async def ensure_indexes():
     await db.saved_meals.create_index([("user_id", 1)], background=True)
     await db.saved_foods.create_index([("user_id", 1), ("use_count", -1)], background=True)
     await db.weight_photos.create_index([("user_id", 1), ("date", 1)], background=True)
-    await db.if_logs.create_index([("user_id", 1), ("date", 1)], background=True)
+    await db.if_logs.create_index([("user_id", 1), ("date", 1)], background=True, unique=True)
     # goal history — snapshot of calorie/macro goals effective from a given date
     await db.goal_history.create_index(
         [("user_id", 1), ("effective_date", 1)], background=True, unique=True

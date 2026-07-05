@@ -1,5 +1,6 @@
 """Gym session tracking — attendance, photos, body analysis."""
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
@@ -16,6 +17,8 @@ from utils import parse_object_id, validate_image_upload
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/gym-sessions", tags=["gym"])
+
+MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
 
 
 def _serialize(doc: dict) -> dict:
@@ -44,8 +47,10 @@ async def create_session(body: GymSessionCreate, user_id: str = Depends(get_curr
 @router.get("")
 async def list_sessions(month: str, user_id: str = Depends(get_current_user)):
     """month format: YYYY-MM"""
+    if not MONTH_RE.match(month):
+        raise HTTPException(status_code=400, detail="month must be in YYYY-MM format")
     db = get_db()
-    docs = await db.gym_sessions.find({"date": {"$regex": f"^{month}"}, "user_id": user_id}).to_list(None)
+    docs = await db.gym_sessions.find({"date": {"$regex": f"^{re.escape(month)}"}, "user_id": user_id}).to_list(None)
     return [_serialize(d) for d in docs]
 
 
@@ -132,10 +137,11 @@ async def upload_photo(
 async def _sync_gym_streak(user_id: str, db):
     profile = await db.user_profile.find_one({"user_id": user_id})
     min_days = (profile or {}).get("gym_streak_min_days_per_week", 5)
+    user_tz = (profile or {}).get("user_timezone", "UTC")
     docs = await db.daily_checkins.find({"gym": True, "user_id": user_id}, {"date": 1}).to_list(None)
     gym_date_list = [d["date"] for d in docs]
-    weekly = await calculate_weekly_gym_streak(gym_date_list, min_days)
-    current_days, best_days = await consecutive_gym_days_with_skip(gym_date_list, max_skip=2)
+    weekly = await calculate_weekly_gym_streak(gym_date_list, min_days, user_tz)
+    current_days, best_days = await consecutive_gym_days_with_skip(gym_date_list, max_skip=2, user_tz=user_tz)
     weekly["current_days"] = current_days
     weekly["best_days"] = best_days
     await db.user_profile.update_one(
