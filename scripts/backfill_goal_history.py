@@ -23,7 +23,7 @@ GOAL_SNAPSHOT_FIELDS = (
 async def main():
     uri = os.environ["MONGODB_URI"]
     client = AsyncIOMotorClient(uri)
-    db = client["fitness_os"]
+    db = client["gympulse"]
 
     async for profile in db.user_profile.find({}):
         user_id = profile["user_id"]

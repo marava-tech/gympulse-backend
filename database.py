@@ -21,7 +21,7 @@ def get_client() -> AsyncIOMotorClient:
 
 
 def get_db():
-    return get_client()["fitness_os"]
+    return get_client()["gympulse"]
 
 
 async def _create_index(collection, keys, **kwargs):

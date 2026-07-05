@@ -19,7 +19,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     datefmt="%Y-%m-%dT%H:%M:%S",
 )
-logger = logging.getLogger("fitness_os")
+logger = logging.getLogger("gympulse")
 
 # ─── Required environment variable check ─────────────────────────────────────
 _REQUIRED_ENV = ["MONGODB_URI", "JWT_SECRET", "FIREBASE_PROJECT_ID"]
