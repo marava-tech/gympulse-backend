@@ -45,6 +45,10 @@ async def ensure_indexes():
     await db.saved_foods.create_index([("user_id", 1), ("use_count", -1)], background=True)
     await db.weight_photos.create_index([("user_id", 1), ("date", 1)], background=True)
     await db.if_logs.create_index([("user_id", 1), ("date", 1)], background=True)
+    # goal history — snapshot of calorie/macro goals effective from a given date
+    await db.goal_history.create_index(
+        [("user_id", 1), ("effective_date", 1)], background=True, unique=True
+    )
     # sparse indexes for streak boolean filters
     await db.daily_checkins.create_index([("user_id", 1), ("gym", 1)], sparse=True, background=True)
     await db.daily_checkins.create_index([("user_id", 1), ("if_followed", 1)], sparse=True, background=True)

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from auth import get_current_user
 from database import get_db
 from services.adaptive_tdee import compute_real_tdee, detect_plateau, build_suggestion
+from services.goal_history import snapshot_goal_history
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,8 @@ async def apply_tdee_suggestion(user_id: str = Depends(get_current_user)):
             "updated_at": datetime.now(timezone.utc),
         }},
     )
+    updated_profile = await db.user_profile.find_one({"user_id": user_id})
+    await snapshot_goal_history(db, user_id, updated_profile)
 
     logger.info("User %s applied adaptive TDEE: goal=%s real_tdee=%s", user_id, new_goal, real_tdee)
     return {
