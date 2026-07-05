@@ -48,14 +48,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy on server
-        uses: appleboy/ssh-action@v1
+        uses: Wandalen/wretry.action@v3
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            docker pull ghcr.io/marava-tech/gympulse-backend:latest
-            docker rm -f gympulse-backend 2>/dev/null || true
-            cd /root/server/services/gympulse-backend
-            docker compose --env-file ../../.env up -d --no-deps --pull never gympulse-backend
-            docker image prune -f
+          action: appleboy/ssh-action@v1
+          attempt_limit: 3
+          attempt_delay: 15000
+          with: |
+            host: ${{ secrets.SERVER_HOST }}
+            username: ${{ secrets.SERVER_USER }}
+            key: ${{ secrets.SERVER_SSH_KEY }}
+            timeout: 60s
+            script: |
+              docker pull ghcr.io/marava-tech/gympulse-backend:latest
+              docker rm -f gympulse-backend 2>/dev/null || true
+              cd /root/server/services/gympulse-backend
+              docker compose --env-file ../../.env up -d --no-deps --pull never gympulse-backend
+              docker image prune -f
