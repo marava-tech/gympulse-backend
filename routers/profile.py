@@ -12,6 +12,7 @@ from models.profile import ProfileCreate, ProfilePatch
 from services.tdee import calculate_tdee
 from services.fcm import send_notification
 from services import minio_client
+from services.goal_history import snapshot_goal_history
 from utils import validate_image_upload
 
 router = APIRouter(prefix="/api/profile", tags=["profile"])
@@ -45,6 +46,7 @@ async def create_profile(body: ProfileCreate, user_id: str = Depends(get_current
     }
     result = await db.user_profile.insert_one(doc)
     doc["_id"] = str(result.inserted_id)
+    await snapshot_goal_history(db, user_id, doc)
     return doc
 
 
@@ -113,6 +115,7 @@ async def patch_profile(body: ProfilePatch, user_id: str = Depends(get_current_u
 
     await db.user_profile.update_one({"user_id": user_id}, {"$set": update_data})
     updated = await db.user_profile.find_one({"user_id": user_id})
+    await snapshot_goal_history(db, user_id, updated)
     updated["_id"] = str(updated["_id"])
     return updated
 

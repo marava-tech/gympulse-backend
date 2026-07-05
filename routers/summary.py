@@ -11,6 +11,33 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/summary", tags=["summary"])
 
 
+async def _goal_for_date(db, user_id: str, date: str, gym_attended: bool) -> dict:
+    """Resolve the calorie/macro goal that was configured as of `date`.
+
+    Looks up the most recent goal_history snapshot on or before `date`. Falls back to
+    the live profile for users/dates that predate goal history tracking.
+    """
+    entry = await db.goal_history.find_one(
+        {"user_id": user_id, "effective_date": {"$lte": date}},
+        sort=[("effective_date", -1)],
+    )
+    if entry is None:
+        entry = await db.user_profile.find_one({"user_id": user_id}) or {}
+
+    def pick(base_field: str, gym_field: str, rest_field: str):
+        value = entry.get(gym_field if gym_attended else rest_field)
+        if value is None:
+            value = entry.get(base_field, 0)
+        return value
+
+    return {
+        "calories_kcal": pick("goal_kcal", "gym_goal_kcal", "rest_goal_kcal"),
+        "protein_g": pick("protein_g", "gym_protein_g", "rest_protein_g"),
+        "carbs_g": pick("carbs_g", "gym_carbs_g", "rest_carbs_g"),
+        "fat_g": pick("fat_g", "gym_fat_g", "rest_fat_g"),
+    }
+
+
 @router.get("")
 async def get_day_summary(date: str, user_id: str = Depends(get_current_user)):
     """date format: YYYY-MM-DD — returns all tracked data for that day."""
@@ -60,6 +87,8 @@ async def get_day_summary(date: str, user_id: str = Depends(get_current_user)):
     if_followed = (checkin or {}).get("if_followed")
     if_summary = {"adhered": if_followed} if if_followed is not None else None
 
+    goals = await _goal_for_date(db, user_id, date, gym_attended)
+
     return {
         "date": date,
         "food": food_summary,
@@ -73,6 +102,7 @@ async def get_day_summary(date: str, user_id: str = Depends(get_current_user)):
         "supplements": supp_names,
         "weight": weight_summary,
         "if_log": if_summary,
+        "goals": goals,
     }
 
 

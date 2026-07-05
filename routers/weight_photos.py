@@ -10,6 +10,7 @@ from database import get_db
 from services import minio_client
 from services.tdee import calculate_tdee
 from services.fcm import send_notification
+from services.goal_history import snapshot_goal_history
 from utils import validate_image_upload
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,8 @@ async def upload_weight_photo(
                 await db.user_profile.update_one(
                     {"user_id": user_id}, {"$set": {**tdee, "weight_kg": weight_kg}}
                 )
+                updated_profile = await db.user_profile.find_one({"user_id": user_id})
+                await snapshot_goal_history(db, user_id, updated_profile)
                 if abs(tdee["goal_kcal"] - old_goal) > 50 and profile.get("fcm_token"):
                     try:
                         await send_notification(
