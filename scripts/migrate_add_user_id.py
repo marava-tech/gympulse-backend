@@ -36,7 +36,7 @@ async def main():
         return
 
     client = AsyncIOMotorClient(uri)
-    db = client["fitness_os"]
+    db = client["gympulse"]
 
     # Fetch the first user to get user_id
     first_user = await db.users.find_one({})
