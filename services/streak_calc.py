@@ -1,11 +1,7 @@
 """Streak calculation — gym (weekly window), IF, food logging, supplement consistency."""
 import asyncio
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from database import get_db
-
-
-def _utc_today() -> date:
-    return datetime.now(timezone.utc).date()
 
 
 def _local_today(user_tz: str) -> date:
@@ -44,7 +40,7 @@ async def consecutive_days(dates: list[str], user_tz: str = "UTC") -> tuple[int,
     return current, best
 
 
-async def consecutive_gym_days_with_skip(dates: list[str], max_skip: int = 2) -> tuple[int, int]:
+async def consecutive_gym_days_with_skip(dates: list[str], max_skip: int = 2, user_tz: str = "UTC") -> tuple[int, int]:
     """
     Returns (current_streak, best_streak) for gym visits, counting each attended day.
     A gap of up to max_skip rest days between sessions is allowed and does not break the streak.
@@ -54,7 +50,7 @@ async def consecutive_gym_days_with_skip(dates: list[str], max_skip: int = 2) ->
         return 0, 0
 
     unique = sorted(set(dates))
-    today = _utc_today()
+    today = _local_today(user_tz)
     last_date = date.fromisoformat(unique[-1])
     days_since_last = (today - last_date).days
 
@@ -102,7 +98,7 @@ def _monday_of_key(key: str) -> date:
     return date.fromisocalendar(int(year), int(week), 1)
 
 
-async def calculate_weekly_gym_streak(gym_dates: list[str], min_days: int) -> dict:
+async def calculate_weekly_gym_streak(gym_dates: list[str], min_days: int, user_tz: str = "UTC") -> dict:
     """
     Gym streak counted in ISO weeks (Mon–Sun).
     A week passes when attended >= min_days days.
@@ -117,7 +113,7 @@ async def calculate_weekly_gym_streak(gym_dates: list[str], min_days: int) -> di
         key = _iso_week_key(d)
         week_counts[key] = week_counts.get(key, 0) + 1
 
-    today = _utc_today()
+    today = _local_today(user_tz)
     current_week_key = _iso_week_key(today)
     current_week_days = week_counts.get(current_week_key, 0)
 
@@ -179,10 +175,10 @@ async def calculate_all_streaks(user_id: str) -> dict:
     )
 
     gym_date_list = [d["date"] for d in gym_docs]
-    gym_weekly = await calculate_weekly_gym_streak(gym_date_list, min_days)
+    gym_weekly = await calculate_weekly_gym_streak(gym_date_list, min_days, user_tz)
 
     # Day-based streak with 2-day skip tolerance (shown in the main chip)
-    gym_days_current, gym_days_best = await consecutive_gym_days_with_skip(gym_date_list, max_skip=2)
+    gym_days_current, gym_days_best = await consecutive_gym_days_with_skip(gym_date_list, max_skip=2, user_tz=user_tz)
     gym_weekly["current_days"] = gym_days_current
     gym_weekly["best_days"] = gym_days_best
 

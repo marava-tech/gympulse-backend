@@ -186,15 +186,14 @@ async def _update_if_log(food_date: str, timestamp: datetime, user_id: str, db):
         # Cross-midnight window (e.g. 22:00–06:00)
         in_window = food_time >= window_start_min or food_time <= window_end_min
 
-    existing = await db.if_logs.find_one({"date": food_date, "user_id": user_id})
-    if existing:
-        # If any entry is outside window, mark non-adherent
-        if not in_window:
-            await db.if_logs.update_one(
-                {"date": food_date, "user_id": user_id}, {"$set": {"adhered": False}}
-            )
-    else:
-        await db.if_logs.insert_one({"date": food_date, "adhered": in_window, "user_id": user_id})
+    # Atomic upsert: adherence stays True only if every entry so far has been
+    # in-window (defaults to True on insert), avoiding a read-then-write race
+    # that could otherwise create duplicate if_logs docs for the same day.
+    await db.if_logs.update_one(
+        {"date": food_date, "user_id": user_id},
+        [{"$set": {"adhered": {"$and": [{"$ifNull": ["$adhered", True]}, in_window]}}}],
+        upsert=True,
+    )
 
 
 @router.post("/analyze")
