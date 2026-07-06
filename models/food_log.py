@@ -71,6 +71,15 @@ class AnalyzeRequest(BaseModel):
     pass
 
 
+class ItemEstimateRequest(BaseModel):
+    """Re-estimate a single item's macros after the user sets cooking method / source type
+    on the review screen (the initial /analyze pass runs before that context is known)."""
+    name: str
+    estimated_weight_g: float
+    cooking_method: Optional[CookingMethod] = None
+    source_type: Optional[SourceType] = None
+
+
 class AnalyzedItem(BaseModel):
     name: str
     estimated_weight_g: float

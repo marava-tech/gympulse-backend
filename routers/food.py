@@ -11,7 +11,7 @@ from typing import Optional
 
 from auth import get_current_user
 from database import get_db
-from models.food_log import FoodLogCreate, FoodItem, MacroSource, MealSlot
+from models.food_log import FoodLogCreate, FoodItem, ItemEstimateRequest, MacroSource, MealSlot
 from services import gemini as gemini_svc
 from services import minio_client
 from services.openfoodfacts import lookup_macros
@@ -256,6 +256,28 @@ async def analyze_food(
         "image_url": image_url,
         "meal_suggestion": meal_suggestion,
     }
+
+
+@router.post("/estimate-item")
+async def estimate_item(body: ItemEstimateRequest, user_id: str = Depends(get_current_user)):
+    """Re-estimate one item's macros once cooking method / home-vs-restaurant is known.
+
+    The initial /analyze pass runs on the photo alone, before the user has set that
+    context on the review screen, so this lets the client refresh the numbers in place.
+    """
+    db = get_db()
+    profile = await db.user_profile.find_one({"user_id": user_id})
+    api_key = get_openrouter_key(profile)
+    if not api_key:
+        raise HTTPException(402, "Set your OpenRouter API key in Settings to use AI features")
+
+    macros = await _resolve_macros(
+        body.name, body.estimated_weight_g, api_key,
+        cooking_method=body.cooking_method.value if body.cooking_method else None,
+        source_type=body.source_type.value if body.source_type else None,
+        user_id=user_id,
+    )
+    return macros
 
 
 @router.post("/logs", status_code=201)
