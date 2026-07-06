@@ -107,8 +107,11 @@ async def _check_gym_photo_nudge():
     await asyncio.gather(*[_send(p) for p in profiles])
 
 
-async def _send_daily_quiz_reminder():
-    """Send daily 10pm IST check-in + today's log summary (runs at 16:30 UTC)."""
+async def _send_checkin_reminder(second: bool = False):
+    """Remind at 10pm / 11:30pm IST to complete today's check-in — only if not done.
+
+    Runs at 16:30 UTC (22:00 IST) and 18:00 UTC (23:30 IST).
+    """
     db = get_db()
     profiles = await db.user_profile.find({"fcm_token": {"$ne": None}}).to_list(None)
 
@@ -118,54 +121,29 @@ async def _send_daily_quiz_reminder():
         user_id = profile_doc.get("user_id")
         tz_name = profile_doc.get("user_timezone", "UTC")
         try:
-            from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
             user_tz = ZoneInfo(tz_name)
-        except Exception:
-            from zoneinfo import ZoneInfo
+        except ZoneInfoNotFoundError:
             user_tz = ZoneInfo("UTC")
 
         today = datetime.now(user_tz).date().isoformat()
+        if await db.daily_checkins.find_one({"user_id": user_id, "date": today}):
+            return  # already checked in — no reminder
 
-        # Fetch today's totals
-        pipeline = [
-            {"$match": {"user_id": user_id, "date": today}},
-            {"$group": {
-                "_id": None,
-                "total_kcal": {"$sum": "$totals.calories_kcal"},
-                "total_protein": {"$sum": "$totals.protein_g"},
-                "meal_count": {"$sum": 1},
-            }},
-        ]
-        totals_docs = await db.food_logs.aggregate(pipeline).to_list(1)
-        totals = totals_docs[0] if totals_docs else {}
-
-        total_kcal = round(totals.get("total_kcal", 0))
-        total_protein = round(totals.get("total_protein", 0))
-        meal_count = totals.get("meal_count", 0)
-        goal_kcal = profile_doc.get("goal_kcal") or 0
-
-        if meal_count == 0:
-            notif_body = "No meals logged yet today — don't forget to track your food!"
-        else:
-            remaining = goal_kcal - total_kcal if goal_kcal else 0
-            remaining_str = (
-                f"{abs(remaining)} kcal {'over' if remaining < 0 else 'remaining'}"
-                if goal_kcal else f"{total_kcal} kcal logged"
-            )
-            notif_body = (
-                f"{total_kcal} kcal · {total_protein}g protein · "
-                f"{meal_count} meal{'s' if meal_count != 1 else ''} — {remaining_str}"
-            )
+        notif_body = (
+            "Last call — you still haven't logged today's check-in. Takes 2 mins."
+            if second else
+            "Time for your evening check-in — takes 2 mins."
+        )
 
         try:
             await fcm_svc.send_notification(
                 profile_doc["fcm_token"],
-                "Today's Log Summary",
+                "📋 Daily Check-in",
                 notif_body,
                 {"type": "daily_quiz", "date": today},
             )
         except Exception as e:
-            logger.error("Failed to send daily quiz reminder FCM for user %s: %s", user_id, e)
+            logger.error("Failed to send check-in reminder FCM for user %s: %s", user_id, e)
 
     await asyncio.gather(*[_send(p) for p in profiles])
 
@@ -215,8 +193,10 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(_send_weekly_summary, "cron", day_of_week="sun", hour=20, minute=0)
     # Daily at 09:00 UTC — gym photo nudge check
     scheduler.add_job(_check_gym_photo_nudge, "cron", hour=9, minute=0)
-    # Daily at 16:30 UTC (22:00 IST) — daily check-in reminder
-    scheduler.add_job(_send_daily_quiz_reminder, "cron", hour=16, minute=30)
+    # Daily at 16:30 UTC (22:00 IST) — check-in reminder if not done
+    scheduler.add_job(_send_checkin_reminder, "cron", hour=16, minute=30)
+    # Daily at 18:00 UTC (23:30 IST) — second check-in reminder if still not done
+    scheduler.add_job(_send_checkin_reminder, "cron", hour=18, minute=0, kwargs={"second": True})
     # Daily at 15:00 UTC (20:30 IST) — EOD reconcile nudge if < 2 meals logged
     scheduler.add_job(_end_of_day_reconcile, "cron", hour=15, minute=0)
     scheduler.start()
