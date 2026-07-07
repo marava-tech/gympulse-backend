@@ -84,8 +84,16 @@ Naming rules:
 - List composite dishes as one item (e.g., "paneer butter masala") — do NOT break into individual ingredients
 - Include preparation: "deep-fried samosa", "boiled egg", "raw cucumber slices"
 
+Cooking method classification (REQUIRED per item):
+- Look at visual cues — sheen/gloss (oil), browning/crust (frying), char marks (grilling), gravy/sauce (curry) — to classify each item's preparation.
+- cooking_method must be exactly one of: "raw", "boiled", "steamed", "grilled", "fried", "curry", "deep_fried"
+- "raw" is ONLY for uncooked food (salads, fruit, raw vegetables) — do not default to raw for any cooked dish
+- Composite dishes with visible gravy/sauce (dal, sabzi, curry, masala) → "curry"
+- Visibly oily/crispy coating or batter → "deep_fried"; light pan-sear/sauté sheen → "fried"
+- Char marks or grill lines → "grilled"; no visible fat/oil and matte surface (idli, boiled egg, steamed rice) → "boiled" or "steamed"
+
 Return ONLY valid JSON, no explanation, no markdown:
-{"items": [{"name": "string", "estimated_weight_g": number}], "scale_weight_g": number or null}"""
+{"items": [{"name": "string", "estimated_weight_g": number, "cooking_method": "string"}], "scale_weight_g": number or null}"""
 
 
 async def analyze_food(image_bytes: bytes, api_key: str) -> dict:
