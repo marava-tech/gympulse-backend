@@ -524,7 +524,7 @@ async def get_food_logs(date: str, user_id: str = Depends(get_current_user)):
 
 @router.get("/daily-totals")
 async def get_daily_totals(days: int = 30, user_id: str = Depends(get_current_user)):
-    """Returns daily aggregated calories + protein for the past N days."""
+    """Returns daily aggregated calories, protein, carbs, and fat for the past N days."""
     db = get_db()
     profile = await db.user_profile.find_one({"user_id": user_id})
     tz_name = (profile or {}).get("user_timezone", "UTC")
@@ -544,12 +544,16 @@ async def get_daily_totals(days: int = 30, user_id: str = Depends(get_current_us
             "_id": "$date",
             "calories_kcal": {"$sum": "$totals.calories_kcal"},
             "protein_g": {"$sum": "$totals.protein_g"},
+            "carbs_g": {"$sum": "$totals.carbs_g"},
+            "fat_g": {"$sum": "$totals.fat_g"},
         }},
         {"$project": {
             "_id": 0,
             "date": "$_id",
             "calories_kcal": {"$round": ["$calories_kcal", 1]},
             "protein_g": {"$round": ["$protein_g", 1]},
+            "carbs_g": {"$round": ["$carbs_g", 1]},
+            "fat_g": {"$round": ["$fat_g", 1]},
         }},
         {"$sort": {"date": 1}},
     ]
