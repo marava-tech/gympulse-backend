@@ -246,7 +246,13 @@ async def analyze_food(
 
     # Resolve macros for all detected items in parallel (with personalized correction blend)
     macro_list = await asyncio.gather(*[
-        _resolve_macros(item["name"], item["estimated_weight_g"], api_key, user_id=user_id) for item in items
+        _resolve_macros(
+            item["name"],
+            item["estimated_weight_g"],
+            api_key,
+            cooking_method=item.get("cooking_method"),
+            user_id=user_id,
+        ) for item in items
     ])
     enriched_items = [{**item, **macros} for item, macros in zip(items, macro_list)]
 
