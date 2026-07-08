@@ -29,3 +29,21 @@ async def get_api_key(user_id: str = Depends(get_current_user)):
         return {"set": False, "masked": None}
     masked = "•" * (len(key) - 4) + key[-4:]
     return {"set": True, "masked": masked}
+
+
+@router.post("/test-api-key")
+async def test_api_key(body: ApiKeyBody, user_id: str = Depends(get_current_user)):
+    from services.gemini import _chat, _TEXT_MODEL
+    try:
+        res = await _chat(
+            model=_TEXT_MODEL,
+            messages=[{"role": "user", "content": "Respond with exactly the word: 'Success'"}],
+            api_key=body.api_key.strip(),
+            max_tokens=10
+        )
+        if "success" in res.lower():
+            return {"valid": True, "message": "API key verified successfully. AI is responding."}
+        else:
+            return {"valid": False, "message": f"Unexpected response: {res}"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"API key verification failed: {str(e)}")

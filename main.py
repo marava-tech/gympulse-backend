@@ -76,36 +76,7 @@ async def _send_weekly_summary():
     await asyncio.gather(*[_send(p) for p in profiles])
 
 
-async def _check_gym_photo_nudge():
-    """Send FCM if no gym photo uploaded in last 7 days."""
-    db = get_db()
-    profiles = await db.user_profile.find({"fcm_token": {"$ne": None}}).to_list(None)
 
-    async def _send(profile_doc):
-        if not profile_doc.get("notification_prefs", {}).get("gym_photo_nudge", True):
-            return
-        user_id = profile_doc.get("user_id")
-        tz_name = profile_doc.get("user_timezone", "UTC")
-        try:
-            user_tz = ZoneInfo(tz_name)
-        except ZoneInfoNotFoundError:
-            user_tz = ZoneInfo("UTC")
-        user_today = datetime.now(user_tz).date()
-        cutoff = (user_today - timedelta(days=7)).isoformat()
-        recent = await db.gym_sessions.find_one(
-            {"date": {"$gte": cutoff}, "photos": {"$ne": []}, "user_id": user_id}
-        )
-        if not recent:
-            try:
-                await fcm_svc.send_notification(
-                    profile_doc["fcm_token"],
-                    "Progress Photo Reminder",
-                    "No gym photos in 7 days — capture your progress!",
-                )
-            except Exception as e:
-                logger.error("Failed to send gym photo nudge FCM for user %s: %s", user_id, e)
-
-    await asyncio.gather(*[_send(p) for p in profiles])
 
 
 async def _send_checkin_reminder(second: bool = False):
@@ -192,8 +163,7 @@ async def lifespan(app: FastAPI):
     await ensure_indexes()
     # Sunday at 20:00 UTC — weekly summary FCM
     scheduler.add_job(_send_weekly_summary, "cron", day_of_week="sun", hour=20, minute=0)
-    # Daily at 09:00 UTC — gym photo nudge check
-    scheduler.add_job(_check_gym_photo_nudge, "cron", hour=9, minute=0)
+
     # Daily at 16:30 UTC (22:00 IST) — check-in reminder if not done
     scheduler.add_job(_send_checkin_reminder, "cron", hour=16, minute=30)
     # Daily at 18:00 UTC (23:30 IST) — second check-in reminder if still not done
