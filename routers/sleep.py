@@ -88,10 +88,22 @@ async def log_sleep(body: SleepLogCreate, user_id: str = Depends(get_current_use
 
 
 @router.get("")
-async def get_sleep_logs(days: int = 30, user_id: str = Depends(get_current_user)):
+async def get_sleep_logs(
+    days: int = 30,
+    start: str | None = None,
+    end: str | None = None,
+    user_id: str = Depends(get_current_user),
+):
     db = get_db()
     query: dict = {"user_id": user_id}
-    if days > 0:
+    if start or end:
+        date_filter: dict = {}
+        if start:
+            date_filter["$gte"] = start
+        if end:
+            date_filter["$lte"] = end
+        query["date"] = date_filter
+    elif days > 0:
         cutoff = (date.today() - timedelta(days=days)).isoformat()
         query["date"] = {"$gte": cutoff}
     docs = await db.sleep_logs.find(query).sort("date", 1).to_list(None)

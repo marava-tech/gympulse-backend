@@ -24,6 +24,7 @@ class FeatureFlags(BaseModel):
     weight_tracking: bool = False
     sleep_tracking: bool = False
     progress_photos: bool = False
+    health_sync: bool = False
 
 
 class ProfileCreate(BaseModel):

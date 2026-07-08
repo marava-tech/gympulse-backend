@@ -47,6 +47,7 @@ from routers import (
     daily_checkin,
     settings as settings_router,
     tdee as tdee_router,
+    health_sync,
 )
 
 scheduler = AsyncIOScheduler()
@@ -231,6 +232,7 @@ app.include_router(notifications.router)
 app.include_router(daily_checkin.router)
 app.include_router(settings_router.router)
 app.include_router(tdee_router.router)
+app.include_router(health_sync.router)
 
 
 @app.get("/health")

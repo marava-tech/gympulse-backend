@@ -568,6 +568,43 @@ async def get_daily_totals(days: int = 30, user_id: str = Depends(get_current_us
     return {"totals": result}
 
 
+@router.get("/daily-totals-by-slot")
+async def get_daily_totals_by_slot(
+    start: str, end: str, user_id: str = Depends(get_current_user)
+):
+    """Same as /daily-totals but broken out per meal_slot, over an explicit
+    [start, end] date range — used to sync each meal to Health Connect under
+    its correct meal type (breakfast/lunch/dinner/other). The caller resolves
+    the range itself: account-creation-to-now for a first sync, or
+    last-sync-to-now for a catch-up sync."""
+    db = get_db()
+    match_stage: dict = {"user_id": user_id, "date": {"$gte": start, "$lte": end}}
+
+    pipeline = [
+        {"$match": match_stage},
+        {"$group": {
+            "_id": {"date": "$date", "meal_slot": "$meal_slot"},
+            "calories_kcal": {"$sum": "$totals.calories_kcal"},
+            "protein_g": {"$sum": "$totals.protein_g"},
+            "carbs_g": {"$sum": "$totals.carbs_g"},
+            "fat_g": {"$sum": "$totals.fat_g"},
+        }},
+        {"$project": {
+            "_id": 0,
+            "date": "$_id.date",
+            "meal_slot": "$_id.meal_slot",
+            "calories_kcal": {"$round": ["$calories_kcal", 1]},
+            "protein_g": {"$round": ["$protein_g", 1]},
+            "carbs_g": {"$round": ["$carbs_g", 1]},
+            "fat_g": {"$round": ["$fat_g", 1]},
+        }},
+        {"$sort": {"date": 1}},
+    ]
+
+    result = await db.food_logs.aggregate(pipeline).to_list(None)
+    return {"totals": result}
+
+
 @router.get("/logging-score")
 async def get_logging_score(days: int = 7, user_id: str = Depends(get_current_user)):
     """Returns a logging consistency score (0–100) for the last N days.
