@@ -19,6 +19,13 @@ class SleepThresholds(BaseModel):
     good_max: float = 8.0    # < this → good; >= this → better
 
 
+class FeatureFlags(BaseModel):
+    """Optional tracking features — all default off. GymPulse's core is nutrition tracking."""
+    weight_tracking: bool = False
+    sleep_tracking: bool = False
+    progress_photos: bool = False
+
+
 class ProfileCreate(BaseModel):
     height_cm: float
     weight_kg: float
@@ -35,6 +42,7 @@ class ProfileCreate(BaseModel):
     if_enabled: bool = False
     subtract_bowl_weight: bool = False
     openrouter_api_key: Optional[str] = None
+    feature_flags: FeatureFlags = Field(default_factory=FeatureFlags)
 
 
 class ProfilePatch(BaseModel):
@@ -69,6 +77,7 @@ class ProfilePatch(BaseModel):
     subtract_bowl_weight: Optional[bool] = None
     openrouter_api_key: Optional[str] = None
     disabled_meal_slots: Optional[List[str]] = None  # e.g. ["breakfast"]
+    feature_flags: Optional[FeatureFlags] = None
 
 
 class TDEEResult(BaseModel):

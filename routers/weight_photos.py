@@ -11,7 +11,7 @@ from services import minio_client
 from services.tdee import calculate_tdee
 from services.fcm import send_notification
 from services.goal_history import snapshot_goal_history
-from utils import validate_image_upload
+from utils import validate_image_upload, require_feature_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,8 @@ async def upload_weight_photo(
         raise HTTPException(status_code=422, detail="At least one of weight_kg or photo must be provided")
 
     db = get_db()
+    profile = await db.user_profile.find_one({"user_id": user_id})
+    require_feature_enabled(profile, "weight_tracking", "Weight tracking")
     image_url: Optional[str] = None
 
     if photo and photo.filename:

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from auth import get_current_user
 from database import get_db
 from models.sleep_log import SleepLogCreate, SleepQuality
+from utils import require_feature_enabled
 
 router = APIRouter(prefix="/api/sleep-logs", tags=["sleep"])
 
@@ -41,6 +42,7 @@ async def log_sleep(body: SleepLogCreate, user_id: str = Depends(get_current_use
 
     db = get_db()
     profile = await db.user_profile.find_one({"user_id": user_id})
+    require_feature_enabled(profile, "sleep_tracking", "Sleep tracking")
     tz_name = (profile or {}).get("user_timezone", "UTC")
     try:
         user_tz = ZoneInfo(tz_name)

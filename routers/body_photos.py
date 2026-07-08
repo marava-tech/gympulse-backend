@@ -11,7 +11,7 @@ from auth import get_current_user
 from database import get_db
 from services import gemini as gemini_svc
 from services import minio_client
-from utils import validate_image_upload, get_openrouter_key
+from utils import validate_image_upload, get_openrouter_key, require_feature_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,8 @@ async def upload_body_photo(
     user_id: str = Depends(get_current_user),
 ):
     db = get_db()
+    profile = await db.user_profile.find_one({"user_id": user_id})
+    require_feature_enabled(profile, "progress_photos", "Progress photos")
 
     image_bytes = await photo.read()
     validate_image_upload(image_bytes, photo.filename or "", photo.content_type)

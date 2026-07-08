@@ -22,6 +22,13 @@ def get_openrouter_key(profile: dict | None) -> str | None:
     return (profile or {}).get("openrouter_api_key") or os.environ.get("OPENROUTER_API_KEY")
 
 
+def require_feature_enabled(profile: dict | None, flag: str, label: str) -> None:
+    """Raise HTTP 403 unless the given feature_flags.<flag> is true on the profile."""
+    flags = (profile or {}).get("feature_flags") or {}
+    if not flags.get(flag, False):
+        raise HTTPException(403, f"{label} is disabled — enable it in Settings first")
+
+
 def parse_object_id(value: str, label: str = "ID") -> ObjectId:
     """Parse a string into ObjectId; raises HTTP 400 on invalid format."""
     try:
