@@ -57,10 +57,10 @@ async def _chat(model: str, messages: list[dict], api_key: str, system: str | No
 _FOOD_SYSTEM = (
     "You are an expert nutritionist and food analyst trained on professional dietary databases "
     "(USDA FoodData Central, NCCDB, Indian Food Composition Tables — IFCT 2017). "
-    "You specialize in visual food identification and accurate portion weight estimation from photos, "
-    "with deep expertise in Indian home-cooked and restaurant food. "
-    "Indian cooked food almost always contains cooking oil or ghee that is NOT visible in the photo — "
-    "you must account for this invisible fat in every curry, sabzi, gravy, and tadka. "
+    "You specialize in food identification and accurate portion weight estimation from photos or "
+    "text descriptions, with deep expertise in Indian home-cooked and restaurant food. "
+    "Indian cooked food almost always contains cooking oil or ghee that goes unmentioned or unseen — "
+    "you must account for this hidden fat in every curry, sabzi, gravy, and tadka. "
     "Your estimates are used for fat-loss health tracking; precision matters and you must NEVER "
     "under-estimate calories — always err on the side of slight overestimation."
 )
@@ -104,6 +104,45 @@ async def analyze_food(image_bytes: bytes, api_key: str) -> dict:
     ]}]
     text = await _chat(_VISION_MODEL, messages, api_key=api_key, system=_FOOD_SYSTEM)
     return _parse_json(text)
+
+
+_FOOD_DESCRIBE_PROMPT = """A user typed this free-text description of a meal they ate. Break it down into
+every distinct food item, with a precise gram weight for each — including any added fats.
+
+Description: "{text}"
+
+Parsing rules:
+- Convert every stated quantity to grams. Use standard conversions: 1 tsp oil/ghee/butter ≈ 4.5g,
+  1 tbsp ≈ 13.5g, 1 cup cooked rice ≈ 200g, 1 cup dal ≈ 250g, 1 roti/chapati ≈ 40g, 1 medium egg ≈ 55g,
+  1 medium banana ≈ 120g, 1 slice bread ≈ 30g, 1 medium chicken breast ≈ 160g. If the user gives an
+  explicit gram/ml/count, use that instead of the default.
+- If the user mentions oil, ghee, butter, or other added fat explicitly (e.g. "2 tsp oil"), list it as
+  its own item so its calories are counted separately — do NOT fold it into the main dish's weight.
+- If no quantity is given for an item, estimate a typical single-serving weight using the anchors above.
+- Be specific in naming: "grilled chicken breast" not "chicken", "cooked basmati rice" not "rice".
+- List composite/named dishes (e.g. "paneer butter masala") as one item — do not decompose into
+  individual ingredients unless the user already listed them separately.
+
+Cooking method classification (REQUIRED per item):
+- cooking_method must be exactly one of: "raw", "boiled", "steamed", "grilled", "fried", "curry", "deep_fried"
+- Infer from words like "cooked", "grilled", "fried", "curry", "raw", "boiled", "steamed" in the text.
+  Default to "curry" for home-style Indian dishes with no cooking word given, "raw" only for
+  uncooked items (salad, fruit, raw vegetables).
+- A standalone added-fat item (oil/ghee/butter) should use cooking_method "raw" (it isn't cooked itself).
+
+Return ONLY valid JSON, no explanation, no markdown:
+{{"items": [{{"name": "string", "estimated_weight_g": number, "cooking_method": "string"}}]}}"""
+
+
+async def describe_food(text: str, api_key: str) -> dict:
+    """Parse a free-text meal description into {items: [{name, estimated_weight_g, cooking_method}]}.
+
+    Text-only counterpart to analyze_food — used by the "describe" logging option (no photo).
+    Runs on the vision model for maximum extraction accuracy on quantities/ingredients.
+    """
+    messages = [{"role": "user", "content": _FOOD_DESCRIBE_PROMPT.format(text=text)}]
+    response = await _chat(_VISION_MODEL, messages, api_key=api_key, system=_FOOD_SYSTEM)
+    return _parse_json(response)
 
 
 _BODY_SYSTEM = (

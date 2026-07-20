@@ -141,3 +141,12 @@ async def list_body_photos(days: int = 90, user_id: str = Depends(get_current_us
     for d in docs:
         d["_id"] = str(d["_id"])
     return {"photos": docs}
+
+
+@router.delete("/{photo_id}", status_code=204)
+async def delete_body_photo(photo_id: str, user_id: str = Depends(get_current_user)):
+    db = get_db()
+    result = await db.body_photos.delete_one({"photo_id": photo_id, "user_id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Body photo not found")
+

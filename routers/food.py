@@ -11,7 +11,7 @@ from typing import Optional
 
 from auth import get_current_user
 from database import get_db
-from models.food_log import FoodLogCreate, FoodItem, ItemEstimateRequest, MacroSource, MealSlot
+from models.food_log import DescribeFoodRequest, FoodLogCreate, FoodItem, ItemEstimateRequest, MacroSource, MealSlot
 from services import gemini as gemini_svc
 from services import minio_client
 from services.openfoodfacts import lookup_macros
@@ -262,6 +262,43 @@ async def analyze_food(
         "image_url": image_url,
         "meal_suggestion": meal_suggestion,
     }
+
+
+@router.post("/describe")
+async def describe_food(body: DescribeFoodRequest, user_id: str = Depends(get_current_user)):
+    """Parse a free-text meal description (e.g. '100g cooked chicken with 2 tsp oil') into items
+    with resolved macros — the text-only counterpart to /analyze, with no photo involved.
+    """
+    db = get_db()
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(400, "Description text is required")
+
+    profile = await db.user_profile.find_one({"user_id": user_id})
+    api_key = get_openrouter_key(profile)
+    if not api_key:
+        raise HTTPException(402, "Set your OpenRouter API key in Settings to use AI features")
+
+    parsed = await gemini_svc.describe_food(text, api_key=api_key)
+    items = parsed.get("items", [])
+    if not items:
+        raise HTTPException(422, "Couldn't identify any food items in that description")
+
+    # Resolve macros for all detected items in parallel (with personalized correction blend)
+    source_type = body.source_type.value if body.source_type else None
+    macro_list = await asyncio.gather(*[
+        _resolve_macros(
+            item["name"],
+            item["estimated_weight_g"],
+            api_key,
+            cooking_method=item.get("cooking_method"),
+            source_type=source_type,
+            user_id=user_id,
+        ) for item in items
+    ])
+    enriched_items = [{**item, **macros} for item, macros in zip(items, macro_list)]
+
+    return {"items": enriched_items}
 
 
 @router.post("/estimate-item")

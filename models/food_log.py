@@ -80,6 +80,13 @@ class ItemEstimateRequest(BaseModel):
     source_type: Optional[SourceType] = None
 
 
+class DescribeFoodRequest(BaseModel):
+    """Free-text food description to be parsed into items + macros, e.g.
+    '100g cooked chicken breast with 2 tsp oil'."""
+    text: str
+    source_type: Optional[SourceType] = None
+
+
 class AnalyzedItem(BaseModel):
     name: str
     estimated_weight_g: float
