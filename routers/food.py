@@ -199,6 +199,8 @@ async def _update_if_log(food_date: str, timestamp: datetime, user_id: str, db):
 @router.post("/analyze")
 async def analyze_food(
     photo: UploadFile = File(...),
+    model: Optional[str] = Form(None),
+    image_url: Optional[str] = Form(None),
     user_id: str = Depends(get_current_user),
 ):
     db = get_db()
@@ -211,12 +213,16 @@ async def analyze_food(
     if not api_key:
         raise HTTPException(402, "Set your OpenRouter API key in Settings to use AI features")
 
-    # Upload to MinIO for storage
-    filename = f"{uuid.uuid4()}.jpg"
-    image_url = await minio_client.upload_image(image_bytes, minio_client.BUCKET_FOOD, filename)
+    # Only upload to MinIO on the first pass — a retry with a different model reuses
+    # the image_url from the original analysis instead of storing a duplicate copy.
+    if not image_url:
+        filename = f"{uuid.uuid4()}.jpg"
+        image_url = await minio_client.upload_image(image_bytes, minio_client.BUCKET_FOOD, filename)
+
+    retry_model = gemini_svc.RETRY_VISION_MODELS.get(model) if model else None
 
     # AI food analysis
-    analysis = await gemini_svc.analyze_food(image_bytes, api_key=api_key)
+    analysis = await gemini_svc.analyze_food(image_bytes, api_key=api_key, model=retry_model)
     items = analysis.get("items", [])
     scale_weight_g = analysis.get("scale_weight_g")
 

@@ -11,9 +11,14 @@ import httpx
 logger = logging.getLogger(__name__)
 
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-# gemini-2.5-pro for vision (best accuracy); gemini-2.5-flash for text (fast + cheap)
-_VISION_MODEL = os.environ.get("OPENROUTER_VISION_MODEL", "google/gemini-2.5-pro")
+_VISION_MODEL = os.environ.get("OPENROUTER_VISION_MODEL", "google/gemini-2.0-flash-001")
 _TEXT_MODEL = os.environ.get("OPENROUTER_TEXT_MODEL", "google/gemini-2.5-flash")
+
+# Alternate vision models offered to the user via "retry with different model"
+RETRY_VISION_MODELS = {
+    "gpt-4o": "openai/gpt-4o",
+    "gemini-2.5-pro": "google/gemini-2.5-pro",
+}
 
 
 def _img_url(image_bytes: bytes, mime: str = "image/jpeg") -> str:
@@ -96,13 +101,13 @@ Return ONLY valid JSON, no explanation, no markdown:
 {"items": [{"name": "string", "estimated_weight_g": number, "cooking_method": "string"}], "scale_weight_g": number or null}"""
 
 
-async def analyze_food(image_bytes: bytes, api_key: str) -> dict:
+async def analyze_food(image_bytes: bytes, api_key: str, model: str | None = None) -> dict:
     """Return {items: [{name, estimated_weight_g}], scale_weight_g: float|None}"""
     messages = [{"role": "user", "content": [
         {"type": "text", "text": _FOOD_ANALYZE_PROMPT},
         {"type": "image_url", "image_url": {"url": _img_url(image_bytes)}},
     ]}]
-    text = await _chat(_VISION_MODEL, messages, api_key=api_key, system=_FOOD_SYSTEM)
+    text = await _chat(model or _VISION_MODEL, messages, api_key=api_key, system=_FOOD_SYSTEM)
     return _parse_json(text)
 
 
