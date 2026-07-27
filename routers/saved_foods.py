@@ -1,6 +1,6 @@
 """Saved food library — individual items for quick reuse."""
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from typing import Optional
 
@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api/saved-foods", tags=["saved-foods"])
 class _UseBody(BaseModel):
     meal_slot: str
     estimated_weight_g: Optional[float] = None
+    date: Optional[str] = None
 
 
 def _serialize(doc: dict) -> dict:
@@ -84,7 +85,14 @@ async def use_saved_food(
         user_tz = ZoneInfo(tz_name)
     except ZoneInfoNotFoundError:
         user_tz = ZoneInfo("UTC")
-    food_date = now.astimezone(user_tz).date().isoformat()
+
+    if body.date:
+        try:
+            food_date = date.fromisoformat(body.date).isoformat()
+        except ValueError:
+            raise HTTPException(400, "Invalid date, expected YYYY-MM-DD")
+    else:
+        food_date = now.astimezone(user_tz).date().isoformat()
 
     # Scale macros proportionally if weight was overridden
     saved_weight = food["estimated_weight_g"]

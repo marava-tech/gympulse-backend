@@ -342,7 +342,15 @@ async def create_food_log(body: FoodLogCreate, background_tasks: BackgroundTasks
         user_tz = ZoneInfo(tz_name)
     except ZoneInfoNotFoundError:
         user_tz = ZoneInfo("UTC")
-    food_date = now.astimezone(user_tz).date().isoformat()
+
+    if body.date:
+        try:
+            food_date = date.fromisoformat(body.date).isoformat()
+        except ValueError:
+            raise HTTPException(400, "Invalid date, expected YYYY-MM-DD")
+    else:
+        # No explicit day supplied (e.g. logging from the home screen) — use today.
+        food_date = now.astimezone(user_tz).date().isoformat()
 
     # Fetch user's API key — only needed if OpenFoodFacts misses an item
     api_key = get_openrouter_key(profile)

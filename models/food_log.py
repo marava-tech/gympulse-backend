@@ -64,6 +64,10 @@ class FoodLogCreate(BaseModel):
     image_url: Optional[str] = None
     note: Optional[str] = None
     source_type: Optional[SourceType] = None
+    # Calendar day (YYYY-MM-DD) the entry should be logged under, e.g. when the
+    # user is adding food to a previous day from the food diary. Falls back to
+    # the user's current local day when omitted.
+    date: Optional[str] = None
 
 
 class AnalyzeRequest(BaseModel):

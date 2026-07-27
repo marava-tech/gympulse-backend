@@ -1,6 +1,6 @@
 """Saved meal library — CRUD."""
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -77,7 +77,9 @@ async def delete_saved_meal(meal_id: str, user_id: str = Depends(get_current_use
 
 
 @router.post("/{meal_id}/use", status_code=201)
-async def use_saved_meal(meal_id: str, meal_slot: str, user_id: str = Depends(get_current_user)):
+async def use_saved_meal(
+    meal_id: str, meal_slot: str, date_str: str | None = None, user_id: str = Depends(get_current_user)
+):
     """Log a saved meal directly to food_logs and increment use_count."""
     db = get_db()
     oid = parse_object_id(meal_id, "meal_id")
@@ -92,7 +94,14 @@ async def use_saved_meal(meal_id: str, meal_slot: str, user_id: str = Depends(ge
         user_tz = ZoneInfo(tz_name)
     except ZoneInfoNotFoundError:
         user_tz = ZoneInfo("UTC")
-    food_date = now.astimezone(user_tz).date().isoformat()
+
+    if date_str:
+        try:
+            food_date = date.fromisoformat(date_str).isoformat()
+        except ValueError:
+            raise HTTPException(400, "Invalid date, expected YYYY-MM-DD")
+    else:
+        food_date = now.astimezone(user_tz).date().isoformat()
 
     doc = {
         "user_id": user_id,
