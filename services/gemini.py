@@ -11,7 +11,9 @@ import httpx
 logger = logging.getLogger(__name__)
 
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-_VISION_MODEL = os.environ.get("OPENROUTER_VISION_MODEL", "google/gemini-2.0-flash-001")
+# google/gemini-2.0-flash-001 was retired from OpenRouter (calls started 404ing) —
+# gemini-2.5-flash is the closest still-available fast/cheap tier.
+_VISION_MODEL = os.environ.get("OPENROUTER_VISION_MODEL", "google/gemini-2.5-flash")
 _TEXT_MODEL = os.environ.get("OPENROUTER_TEXT_MODEL", "google/gemini-2.5-flash")
 
 # Alternate vision models offered to the user via "retry with different model"
