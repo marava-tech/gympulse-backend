@@ -14,6 +14,11 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 _OTP_TTL_MINUTES = 5
 
+# Play Store reviewer login — accepts a fixed OTP so review can proceed without
+# needing to receive a real email. No other account gets this bypass.
+_REVIEWER_EMAIL = "kinnerapavankalyan7@gmail.com"
+_REVIEWER_OTP = "000000"
+
 
 def _generate_otp() -> str:
     return "".join(random.choices(string.digits, k=6))
@@ -27,6 +32,9 @@ async def send_otp(body: SendOtpRequest):
     """Send OTP to email. Creates user if first time."""
     db = get_db()
     email = body.email.lower()
+
+    if email == _REVIEWER_EMAIL:
+        return {"message": "OTP sent"}
 
     existing = await db.otp_requests.find_one({"email": email})
     if existing:
@@ -60,21 +68,25 @@ async def verify_otp(body: VerifyOtpRequest):
     email = body.email.lower()
     otp = body.otp.strip()
 
-    record = await db.otp_requests.find_one({"email": email})
-    if not record:
-        raise HTTPException(status_code=400, detail="No OTP found — please request a new one")
+    if email == _REVIEWER_EMAIL:
+        if otp != _REVIEWER_OTP:
+            raise HTTPException(status_code=400, detail="Invalid OTP")
+    else:
+        record = await db.otp_requests.find_one({"email": email})
+        if not record:
+            raise HTTPException(status_code=400, detail="No OTP found — please request a new one")
 
-    expires_at = record["expires_at"]
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if datetime.now(timezone.utc) > expires_at:
+        expires_at = record["expires_at"]
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expires_at:
+            await db.otp_requests.delete_many({"email": email})
+            raise HTTPException(status_code=400, detail="OTP expired — please request a new one")
+
+        if record["otp"] != otp:
+            raise HTTPException(status_code=400, detail="Invalid OTP")
+
         await db.otp_requests.delete_many({"email": email})
-        raise HTTPException(status_code=400, detail="OTP expired — please request a new one")
-
-    if record["otp"] != otp:
-        raise HTTPException(status_code=400, detail="Invalid OTP")
-
-    await db.otp_requests.delete_many({"email": email})
 
     existing = await db.users.find_one({"email": email})
     is_new = existing is None
