@@ -7,7 +7,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone, date, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import FastAPI
+import httpx
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from database import get_db, ensure_indexes
@@ -184,6 +186,17 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+
+
+@app.exception_handler(httpx.HTTPStatusError)
+async def _openrouter_error(request: Request, exc: httpx.HTTPStatusError):
+    # OpenRouter rejected the key (invalid / server spend cap hit) → 402 so the app prompts for a personal key
+    if exc.response.status_code in (401, 402, 403):
+        return JSONResponse(status_code=402, content={"detail": "AI credits exhausted — add your OpenRouter API key in Settings"})
+    logger.error("OpenRouter error %s: %s", exc.response.status_code, exc.response.text[:300])
+    return JSONResponse(status_code=502, content={"detail": "AI service error, please try again"})
+
 
 app.include_router(auth_router.router)
 app.include_router(profile.router)
