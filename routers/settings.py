@@ -39,7 +39,8 @@ async def test_api_key(body: ApiKeyBody, user_id: str = Depends(get_current_user
             model=_TEXT_MODEL,
             messages=[{"role": "user", "content": "Respond with exactly the word: 'Success'"}],
             api_key=body.api_key.strip(),
-            max_tokens=10
+            max_tokens=10,
+            fallback=False,
         )
         if "success" in res.lower():
             return {"valid": True, "message": "API key verified successfully. AI is responding."}

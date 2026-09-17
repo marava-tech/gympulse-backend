@@ -44,7 +44,7 @@ def _parse_json(text: str | None) -> dict:
         raise
 
 
-async def _chat(model: str, messages: list[dict], api_key: str, system: str | None = None, max_tokens: int | None = None) -> str:
+async def _chat(model: str, messages: list[dict], api_key: str, system: str | None = None, max_tokens: int | None = None, fallback: bool = True) -> str:
     headers = {
         "Authorization": f"Bearer {api_key.strip()}",
         "Content-Type": "application/json",
@@ -55,8 +55,15 @@ async def _chat(model: str, messages: list[dict], api_key: str, system: str | No
         payload["messages"] = [{"role": "system", "content": system}] + messages
     if max_tokens:
         payload["max_tokens"] = max_tokens
+    server_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     async with httpx.AsyncClient(timeout=90) as client:
         resp = await client.post(_OPENROUTER_URL, headers=headers, json=payload)
+        # User's personal key invalid / out of credits → retry once with the server key
+        # (the server key has a spend cap on OpenRouter, so it stops on its own).
+        if fallback and resp.status_code in (401, 402, 403) and server_key and api_key.strip() != server_key:
+            logger.warning("User OpenRouter key rejected (%s), falling back to server key", resp.status_code)
+            headers["Authorization"] = f"Bearer {server_key}"
+            resp = await client.post(_OPENROUTER_URL, headers=headers, json=payload)
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"]
 
