@@ -139,7 +139,7 @@ async def get_me(user_id: str = Depends(get_current_user)):
     user = await db.users.find_one({"_id": ObjectId(user_id)})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return {"username": user.get("username", ""), "email": user.get("email", "")}
+    return {"id": user_id, "username": user.get("username", ""), "email": user.get("email", "")}
 
 
 @router.patch("/username", status_code=200)

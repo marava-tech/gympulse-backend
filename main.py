@@ -33,6 +33,7 @@ def _check_env():
 
 from routers import (
     ai_quota as ai_quota_router,
+    billing,
     auth_router,
     profile,
     food,
@@ -218,6 +219,7 @@ app.include_router(settings_router.router)
 app.include_router(tdee_router.router)
 app.include_router(health_sync.router)
 app.include_router(ai_quota_router.router)
+app.include_router(billing.router)
 
 
 @app.get("/health")
