@@ -80,3 +80,6 @@ async def ensure_indexes():
     await _create_index(db.otp_requests, "expires_at", expireAfterSeconds=0, background=True)
     await _create_index(db.users, "email", unique=True, sparse=True, background=True)
     logger.info("MongoDB indexes ensured")
+    # AI scan quota — one doc per user per day, auto-deleted after expires_at
+    await _create_index(db.ai_usage, [("user_id", 1), ("date", 1)], background=True, unique=True)
+    await _create_index(db.ai_usage, "expires_at", expireAfterSeconds=0, background=True)
