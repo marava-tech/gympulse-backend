@@ -12,6 +12,7 @@ from typing import Optional
 from auth import get_current_user
 from database import get_db
 from models.food_log import DescribeFoodRequest, FoodLogCreate, FoodItem, ItemEstimateRequest, MacroSource, MealSlot
+from services import ai_quota
 from services import gemini as gemini_svc
 from services import minio_client
 from services.openfoodfacts import lookup_macros
@@ -202,6 +203,7 @@ async def analyze_food(
     model: Optional[str] = Form(None),
     image_url: Optional[str] = Form(None),
     user_id: str = Depends(get_current_user),
+    _quota: None = Depends(ai_quota.photo_scan_gate),
 ):
     db = get_db()
     image_bytes = await photo.read()
@@ -271,7 +273,11 @@ async def analyze_food(
 
 
 @router.post("/describe")
-async def describe_food(body: DescribeFoodRequest, user_id: str = Depends(get_current_user)):
+async def describe_food(
+    body: DescribeFoodRequest,
+    user_id: str = Depends(get_current_user),
+    _quota: None = Depends(ai_quota.scan_gate),
+):
     """Parse a free-text meal description (e.g. '100g cooked chicken with 2 tsp oil') into items
     with resolved macros — the text-only counterpart to /analyze, with no photo involved.
     """
