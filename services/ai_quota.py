@@ -15,11 +15,18 @@ from auth import get_current_user
 from database import get_db
 
 FREE_DAILY = int(os.environ.get("AI_FREE_SCANS_PER_DAY", "3"))
+PREMIUM_DAILY = int(os.environ.get("AI_PREMIUM_SCANS_PER_DAY", "25"))
 MAX_REWARDS_PER_DAY = int(os.environ.get("AI_MAX_REWARDS_PER_DAY", "5"))
 
 
 def has_own_key(profile: dict | None) -> bool:
     return bool((profile or {}).get("openrouter_api_key"))
+
+
+async def _premium(db, user_id: str) -> bool:
+    # local import: entitlements imports this module (has_own_key)
+    from services.entitlements import is_premium
+    return await is_premium(db, user_id)
 
 
 def _today(profile: dict | None) -> str:
@@ -45,8 +52,10 @@ async def status(db, user_id: str, profile: dict | None) -> dict:
     day = _today(profile)
     await _ensure_doc(db, user_id, day)
     doc = await db.ai_usage.find_one({"user_id": user_id, "date": day})
-    limit = FREE_DAILY + doc["bonus"]
+    premium = await _premium(db, user_id)
+    limit = (PREMIUM_DAILY if premium else FREE_DAILY) + doc["bonus"]
     return {
+        "premium": premium,
         "unlimited": has_own_key(profile),
         "limit": limit,
         "used": doc["used"],
@@ -61,9 +70,10 @@ async def consume(db, user_id: str, profile: dict | None) -> None:
         return
     day = _today(profile)
     await _ensure_doc(db, user_id, day)
+    base = PREMIUM_DAILY if await _premium(db, user_id) else FREE_DAILY
     res = await db.ai_usage.update_one(
         {"user_id": user_id, "date": day,
-         "$expr": {"$lt": ["$used", {"$add": [FREE_DAILY, "$bonus"]}]}},
+         "$expr": {"$lt": ["$used", {"$add": [base, "$bonus"]}]}},
         {"$inc": {"used": 1}},
     )
     if res.modified_count == 0:
@@ -89,6 +99,8 @@ async def refund(db, user_id: str, profile: dict | None) -> None:
 async def grant_reward(db, user_id: str, profile: dict | None) -> dict:
     # ponytail: trusts the client after a rewarded ad; per-day cap bounds abuse.
     # Upgrade to AdMob server-side verification (SSV) if abuse shows up.
+    if await _premium(db, user_id):
+        raise HTTPException(400, "Premium has no ads — no bonus scans needed")
     day = _today(profile)
     await _ensure_doc(db, user_id, day)
     res = await db.ai_usage.update_one(

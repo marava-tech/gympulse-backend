@@ -14,7 +14,8 @@ from services import ai_quota  # noqa: E402
 
 async def main():
     db = get_db()
-    await db.ai_usage.delete_many({})
+    for c in ("ai_usage", "user_profile", "entitlements"):
+        await db[c].delete_many({})
     u, profile = "u1", {"user_timezone": "Asia/Kolkata"}
 
     for _ in range(3):

@@ -11,6 +11,7 @@ from auth import get_current_user
 from database import get_db
 from services import gemini as gemini_svc
 from services import minio_client
+from services import entitlements
 from utils import validate_image_upload, get_openrouter_key, require_feature_enabled
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,11 @@ class CompareRequest(BaseModel):
 
 
 @router.post("/compare")
-async def compare_body_photos(req: CompareRequest, user_id: str = Depends(get_current_user)):
+async def compare_body_photos(
+    req: CompareRequest,
+    user_id: str = Depends(get_current_user),
+    _premium: None = Depends(entitlements.require_premium),
+):
     """Compare 2–3 body photos using AI visual progression analysis."""
     if len(req.photo_ids) < 2 or len(req.photo_ids) > 3:
         raise HTTPException(status_code=400, detail="Select 2 or 3 photos to compare")
