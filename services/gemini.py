@@ -355,3 +355,33 @@ async def estimate_macros(
     messages = [{"role": "user", "content": prompt}]
     text = await _chat(_TEXT_MODEL, messages, api_key=api_key, system=_MACRO_SYSTEM, max_tokens=200)
     return _parse_json(text)
+
+
+_INSIGHTS_SYSTEM = (
+    "You are a practical nutrition coach reviewing one week of a user's food log, with deep knowledge "
+    "of Indian home cooking (roti, rice, dal, sabzi, ghee/oil, thali portions). You explain what the "
+    "numbers show and give small, specific changes for next week. You never diagnose, never give "
+    "medical advice, and never shame the user."
+)
+
+_INSIGHTS_PROMPT = """Here are the user's stats for the week (JSON). Missing keys mean no data — do not mention them.
+{stats}
+
+Rules:
+- Use ONLY numbers that appear in the stats. Never invent numbers, foods, or habits.
+- kcal_share_by_meal_pct and most_logged_foods describe what they actually ate; use them for concrete advice.
+- Suggest changes that are easy in Indian eating (e.g. an extra dal/paneer/egg for protein, less oil in curry, smaller rice portion).
+- Plain, direct, friendly. No emojis, no lectures.
+
+Return ONLY valid JSON:
+{{"headline": "one sentence summing up the week",
+  "wins": ["1-2 things that went well, each one sentence"],
+  "fixes": [{{"title": "3-6 words", "detail": "1-2 sentences with the specific change"}}],
+  "next_week_goal": "one measurable goal for next week"}}
+Give 1-3 fixes."""
+
+
+async def weekly_insights(stats: dict, api_key: str) -> dict:
+    messages = [{"role": "user", "content": _INSIGHTS_PROMPT.format(stats=json.dumps(stats))}]
+    text = await _chat(_TEXT_MODEL, messages, api_key=api_key, system=_INSIGHTS_SYSTEM, max_tokens=1200)
+    return _parse_json(text)

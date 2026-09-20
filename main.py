@@ -34,6 +34,7 @@ def _check_env():
 from routers import (
     ai_quota as ai_quota_router,
     billing,
+    insights,
     auth_router,
     profile,
     food,
@@ -70,9 +71,9 @@ async def _send_weekly_summary():
         try:
             await fcm_svc.send_notification(
                 profile_doc["fcm_token"],
-                "Weekly Summary Ready",
-                "Your fitness week is complete — tap to see your summary.",
-                {"week": week},
+                "Your weekly insights are ready",
+                "See what went well and the one thing to fix next week.",
+                {"week": week, "type": "weekly_insights"},
             )
         except Exception as e:
             logger.error("Failed to send weekly summary FCM for user %s: %s", profile_doc.get("user_id"), e)
@@ -220,6 +221,7 @@ app.include_router(tdee_router.router)
 app.include_router(health_sync.router)
 app.include_router(ai_quota_router.router)
 app.include_router(billing.router)
+app.include_router(insights.router)
 
 
 @app.get("/health")
