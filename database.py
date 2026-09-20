@@ -84,3 +84,5 @@ async def ensure_indexes():
     await _create_index(db.ai_usage, [("user_id", 1), ("date", 1)], background=True, unique=True)
     await _create_index(db.ai_usage, "expires_at", expireAfterSeconds=0, background=True)
     await _create_index(db.entitlements, [("user_id", 1)], background=True, unique=True)
+    await _create_index(db.weekly_insights, [("user_id", 1), ("week", 1)], background=True, unique=True)
+    await _create_index(db.weekly_insights, "expires_at", expireAfterSeconds=0, background=True)
