@@ -1,17 +1,13 @@
-import asyncio
-import os
 import random
 import string
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from bson import ObjectId
-from google.auth.transport import requests as google_requests
-from google.oauth2 import id_token as google_id_token
 
 from database import get_db
 from auth import create_access_token, get_current_user
-from models.user import GoogleLoginRequest, SendOtpRequest, VerifyOtpRequest, Token, UsernameUpdate
+from models.user import SendOtpRequest, VerifyOtpRequest, Token, UsernameUpdate
 from services.email_service import send_otp as send_otp_email
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -113,24 +109,6 @@ async def _login_or_create(db, email: str) -> Token:
         access_token=create_access_token(user_id),
         is_new_user=is_new,
     )
-
-
-@router.post("/google", response_model=Token)
-async def google_login(body: GoogleLoginRequest):
-    """Sign in with a Google ID token (one-tap, no email round-trip). Same user record as OTP."""
-    audiences = [a.strip() for a in os.environ.get("GOOGLE_CLIENT_IDS", "").split(",") if a.strip()]
-    if not audiences:
-        raise HTTPException(503, "Google sign-in is not configured")
-    try:
-        info = await asyncio.to_thread(
-            google_id_token.verify_oauth2_token, body.id_token, google_requests.Request(), audiences
-        )
-    except ValueError:
-        raise HTTPException(401, "Invalid Google sign-in")
-    email = (info.get("email") or "").lower()
-    if not email or not info.get("email_verified"):
-        raise HTTPException(401, "Google account email is not verified")
-    return await _login_or_create(get_db(), email)
 
 
 @router.get("/me")
